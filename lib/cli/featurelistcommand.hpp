@@ -43,8 +43,10 @@ public:
 	    ArgumentCompletionDescription& argCompletionDesc) const;
 	virtual int Run(const boost::program_options::variables_map& vm, const std::vector<std::string>& ap) const;
 
+        static void CollectFeatures(const String& path, std::vector<String>& features);
+
 private:
-	static void CollectFeatures(const String& feature_file, std::vector<String>& features);
+        static void CollectFeaturesInternal(const String& feature_file, std::vector<String>& features);
 
 };
 

@@ -62,36 +62,29 @@ int FeatureListCommand::Run(const boost::program_options::variables_map& vm, con
 		Log(LogWarning, "cli", "Ignoring parameters: " + boost::algorithm::join(ap, " "));
 	}
 
-#ifdef _WIN32
-	//TODO: Add Windows support
-	Log(LogInformation, "cli", "This command is not available on Windows.");
-#else
 	std::vector<String> enabled_features;
 	std::vector<String> available_features;
 
-	if (!Utility::Glob(Application::GetSysconfDir() + "/icinga2/features-enabled/*.conf",
-	    boost::bind(&FeatureListCommand::CollectFeatures, _1, boost::ref(enabled_features)), GlobFile)) {
-		Log(LogCritical, "cli", "Cannot access path '" + Application::GetSysconfDir() + "/icinga2/features-enabled/'.");
-	}
-
-	if (!Utility::Glob(Application::GetSysconfDir() + "/icinga2/features-available/*.conf",
-	    boost::bind(&FeatureListCommand::CollectFeatures, _1, boost::ref(available_features)), GlobFile)) {
-		Log(LogCritical, "cli", "Cannot access path '" + Application::GetSysconfDir() + "/icinga2/available-available/'.");
-	}
+	CollectFeatures(Application::GetSysconfDir() + "/icinga2/features-enabled/", enabled_features);
+	CollectFeatures(Application::GetSysconfDir() + "/icinga2/features-available/", available_features);
 
 	Log(LogInformation, "cli", "Available features: " + boost::algorithm::join(available_features, " "));
 	Log(LogInformation, "cli", "---");
 	Log(LogInformation, "cli", "Enabled features: " + boost::algorithm::join(enabled_features, " "));
-#endif /* _WIN32 */
 
 	return 0;
 }
 
-void FeatureListCommand::CollectFeatures(const String& feature_file, std::vector<String>& features)
+void FeatureListCommand::CollectFeatures(const String& path, std::vector<String>& features)
+{
+	if (!Utility::Glob(path + "/*.conf", boost::bind(&FeatureListCommand::CollectFeaturesInternal, _1, boost::ref(features)), GlobFile)) {
+		Log(LogCritical, "cli", "Cannot access path '" + path + ".");
+	}
+}
+
+void FeatureListCommand::CollectFeaturesInternal(const String& feature_file, std::vector<String>& features)
 {
 	String feature = Utility::BaseName(feature_file);
 	boost::algorithm::replace_all(feature, ".conf", "");
-
-	Log(LogDebug, "cli", "Adding feature: " + feature);
 	features.push_back(feature);
 }
