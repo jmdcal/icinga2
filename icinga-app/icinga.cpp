@@ -51,7 +51,7 @@ SERVICE_STATUS_HANDLE l_SvcStatusHandle;
 static std::vector<String> LogLevelCompletion(const String& arg)
 {
 	std::vector<String> result;
-	
+
 	String debugLevel = "debug";
 	if (debugLevel.Find(arg) == 0)
 		result.push_back(debugLevel);
@@ -165,15 +165,17 @@ int Main(void)
 
 	hiddenDesc.add_options()
 		("no-stack-rlimit", "used internally, do not specify manually")
-		("arg", po::value<std::vector<std::string> >(), "positional argument");
+		("arg1", po::value<std::vector<std::string> >(), "positional argument")
+		("argn", po::value<std::vector<std::string> >(), "positional argument");
 
 	po::positional_options_description positionalDesc;
-	positionalDesc.add("arg", -1);
+	positionalDesc.add("arg1", 2);
+	positionalDesc.add("argn", -1);
 
 	ArgumentCompletionDescription argDesc;
 	argDesc["include"] = BashArgumentCompletion("directory");
 	argDesc["log-level"] = LogLevelCompletion;
-	
+
 	String cmdname;
 	CLICommand::Ptr command;
 	po::variables_map vm;
@@ -312,10 +314,10 @@ int Main(void)
 	} else if (command) {
 #ifndef _WIN32
 		String group = Application::GetRunAsGroup();
-	
+
 		errno = 0;
 		struct group *gr = getgrnam(group.CStr());
-	
+
 		if (!gr) {
 			if (errno == 0) {
 				std::ostringstream msgbuf;
@@ -329,7 +331,7 @@ int Main(void)
 				return EXIT_FAILURE;
 			}
 		}
-	
+
 		if (getgid() != gr->gr_gid) {
 			if (!vm.count("reload-internal") && setgroups(0, NULL) < 0) {
 				std::ostringstream msgbuf;
@@ -337,7 +339,7 @@ int Main(void)
 				Log(LogCritical, "cli",  msgbuf.str());
 				return EXIT_FAILURE;
 			}
-	
+
 			if (setgid(gr->gr_gid) < 0) {
 				std::ostringstream msgbuf;
 				msgbuf << "setgid() failed with error code " << errno << ", \"" << Utility::FormatErrorNumber(errno) << "\"";
@@ -345,12 +347,12 @@ int Main(void)
 				return EXIT_FAILURE;
 			}
 		}
-	
+
 		String user = Application::GetRunAsUser();
-	
+
 		errno = 0;
 		struct passwd *pw = getpwnam(user.CStr());
-	
+
 		if (!pw) {
 			if (errno == 0) {
 				std::ostringstream msgbuf;
@@ -364,7 +366,7 @@ int Main(void)
 				return EXIT_FAILURE;
 			}
 		}
-	
+
 		// also activate the additional groups the configured user is member of
 		if (getuid() != pw->pw_uid) {
 			if (!vm.count("reload-internal") && initgroups(user.CStr(), pw->pw_gid) < 0) {
@@ -373,7 +375,7 @@ int Main(void)
 				Log(LogCritical, "cli",  msgbuf.str());
 				return EXIT_FAILURE;
 			}
-	
+
 			if (setuid(pw->pw_uid) < 0) {
 				std::ostringstream msgbuf;
 				msgbuf << "setuid() failed with error code " << errno << ", \"" << Utility::FormatErrorNumber(errno) << "\"";

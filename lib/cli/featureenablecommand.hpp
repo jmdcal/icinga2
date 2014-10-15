@@ -26,6 +26,8 @@
 namespace icinga
 {
 
+I2_BASE_API ArgumentCompletionCallback FeatureArgumentCompletion(const String& type);
+
 /**
  * The "feature enable" command.
  *

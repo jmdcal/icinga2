@@ -18,6 +18,7 @@
  ******************************************************************************/
 
 #include "cli/featureenablecommand.hpp"
+#include "cli/featurelistcommand.hpp"
 #include "base/logger_fwd.hpp"
 #include "base/clicommand.hpp"
 #include "base/application.hpp"
@@ -34,6 +35,19 @@ namespace po = boost::program_options;
 
 REGISTER_CLICOMMAND("feature/enable", FeatureEnableCommand);
 
+static std::vector<String> FeatureArgumentCompletionHelper(const String& type, const String& arg)
+{
+	std::vector<String> features;
+	FeatureListCommand::CollectFeatures(Application::GetSysconfDir() + "/icinga2/features-available/", features);
+
+	return features;
+}
+
+ArgumentCompletionCallback icinga::FeatureArgumentCompletion(const String& type)
+{
+	return boost::bind(FeatureArgumentCompletionHelper, type, _1);
+}
+
 String FeatureEnableCommand::GetDescription(void) const
 {
 	return "Enables specified Icinga 2 feature.";
@@ -49,6 +63,10 @@ void FeatureEnableCommand::InitParameters(boost::program_options::options_descri
     ArgumentCompletionDescription& argCompletionDesc) const
 {
 	/* Command doesn't support any parameters. */
+	visibleDesc.add_options()
+		("arg1", po::value<std::vector<std::string> >(), "positional argument");
+
+	argCompletionDesc["arg1"] = FeatureArgumentCompletion("available");
 }
 
 /**
