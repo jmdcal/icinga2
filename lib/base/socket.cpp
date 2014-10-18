@@ -22,6 +22,7 @@
 #include "base/utility.hpp"
 #include "base/exception.hpp"
 #include "base/logger.hpp"
+#include "base/initialize.hpp"
 #include <sstream>
 #include <iostream>
 #include <boost/exception/errinfo_api_function.hpp>
@@ -32,6 +33,20 @@
 #endif /* _WIN32 */
 
 using namespace icinga;
+
+#ifdef _WIN32
+static void InitWinSock(void)
+{
+	WSADATA wsaData;
+	if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
+		BOOST_THROW_EXCEPTION(win32_error()
+			<< boost::errinfo_api_function("WSAStartup")
+			<< errinfo_win32_error(WSAGetLastError()));
+	}
+}
+
+INITIALIZE_ONCE(&InitWinSock);
+#endif /* _WIN32 */
 
 /**
  * Constructor for the Socket class.

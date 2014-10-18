@@ -65,13 +65,6 @@ void Application::OnConfigLoaded(void)
 #ifdef _WIN32
 	/* disable GUI-based error messages for LoadLibrary() */
 	SetErrorMode(SEM_FAILCRITICALERRORS);
-
-	WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
-		BOOST_THROW_EXCEPTION(win32_error()
-		    << boost::errinfo_api_function("WSAStartup")
-		    << errinfo_win32_error(WSAGetLastError()));
-	}
 #endif /* _WIN32 */
 
 	ASSERT(m_Instance == NULL);
