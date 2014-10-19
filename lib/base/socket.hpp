@@ -30,6 +30,8 @@
 namespace icinga
 {
 
+I2_BASE_API void SocketPair(SOCKET sockets[2]);
+
 /**
  * Base class for connection-oriented sockets.
  *

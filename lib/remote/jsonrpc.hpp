@@ -22,6 +22,7 @@
 
 #include "base/stream.hpp"
 #include "base/dictionary.hpp"
+#include "base/netstring.hpp"
 #include "remote/i2-remote.hpp"
 
 namespace icinga
@@ -36,7 +37,7 @@ class I2_REMOTE_API JsonRpc
 {
 public:
 	static void SendMessage(const Stream::Ptr& stream, const Dictionary::Ptr& message);
-	static Dictionary::Ptr ReadMessage(const Stream::Ptr& stream);
+	static Dictionary::Ptr ReadMessage(const Stream::Ptr& stream, NetStringContext& context);
 
 private:
 	JsonRpc(void);

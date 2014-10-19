@@ -46,4 +46,6 @@ typedef DWORD pid_t;
 #define strcasecmp stricmp
 #endif /* _MSC_VER */
 
+#define poll WSAPoll
+
 #endif /* WIN32_H */

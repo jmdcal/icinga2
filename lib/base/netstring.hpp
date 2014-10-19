@@ -27,6 +27,24 @@
 namespace icinga
 {
 
+struct NetStringContext
+{
+	NetStringContext(void)
+		: HeaderLength(0), Data(NULL), DataLength(0)
+	{ }
+
+	~NetStringContext(void)
+	{
+		delete [] Data;
+	}
+
+	char Header[16];
+	size_t HeaderLength;
+
+	char *Data;
+	size_t DataLength;
+};
+
 /**
  * Helper functions for reading/writing messages in the netstring format.
  *
@@ -37,7 +55,7 @@ namespace icinga
 class I2_BASE_API NetString
 {
 public:
-	static bool ReadStringFromStream(const Stream::Ptr& stream, String *message);
+	static bool ReadStringFromStream(const Stream::Ptr& stream, String *message, NetStringContext& context);
 	static void WriteStringToStream(const Stream::Ptr& stream, const String& message);
 
 private:

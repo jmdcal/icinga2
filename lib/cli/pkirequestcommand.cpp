@@ -112,9 +112,11 @@ int PKIRequestCommand::Run(const boost::program_options::variables_map& vm, cons
 
 	shared_ptr<SSL_CTX> sslContext = MakeSSLContext(certfile, vm["keyfile"].as<std::string>());
 
-	TlsStream::Ptr stream = make_shared<TlsStream>(client, RoleClient, sslContext);
+	NetworkStream::Ptr stream = make_shared<NetworkStream>(client);
 
-	stream->Handshake();
+	TlsStream::Ptr tlsStream = make_shared<TlsStream>(stream, RoleClient, sslContext);
+
+	tlsStream->Handshake();
 
 	Dictionary::Ptr request = make_shared<Dictionary>();
 
@@ -129,12 +131,13 @@ int PKIRequestCommand::Run(const boost::program_options::variables_map& vm, cons
 
 	request->Set("params", params);
 
-	JsonRpc::SendMessage(stream, request);
+	JsonRpc::SendMessage(tlsStream, request);
 
 	Dictionary::Ptr response;
 
 	for (;;) {
-		response = JsonRpc::ReadMessage(stream);
+		NetStringContext context;
+		response = JsonRpc::ReadMessage(tlsStream, context);
 
 		if (response->Get("id") != msgid)
 			continue;

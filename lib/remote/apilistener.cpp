@@ -262,12 +262,14 @@ void ApiListener::NewClientHandler(const Socket::Ptr& client, ConnectionRole rol
 {
 	CONTEXT("Handling new API client connection");
 
+	NetworkStream::Ptr stream = make_shared<NetworkStream>(client);
+
 	TlsStream::Ptr tlsStream;
 
 	{
 		ObjectLock olock(this);
 		try {
-			tlsStream = make_shared<TlsStream>(client, role, m_SSLContext);
+			tlsStream = make_shared<TlsStream>(stream, role, m_SSLContext);
 		} catch (const std::exception&) {
 			Log(LogCritical, "ApiListener", "Cannot create tls stream from client connection.");
 			return;
@@ -294,7 +296,7 @@ void ApiListener::NewClientHandler(const Socket::Ptr& client, ConnectionRole rol
 	bool verify_ok = tlsStream->IsVerifyOK();
 
 	Log(LogInformation, "ApiListener")
-	    << "New client connection for identity '" << identity << "'" << (verify_ok ? "" : " (unauthenticated");
+	    << "New client connection for identity '" << identity << "'" << (verify_ok ? "" : " (unauthenticated)");
 
 	Endpoint::Ptr endpoint;
 
@@ -306,8 +308,9 @@ void ApiListener::NewClientHandler(const Socket::Ptr& client, ConnectionRole rol
 	if (endpoint)
 		need_sync = !endpoint->IsConnected();
 
+	tlsStream->MakeNonBlocking();
+
 	ApiClient::Ptr aclient = make_shared<ApiClient>(identity, verify_ok, tlsStream, role);
-	aclient->Start();
 
 	if (endpoint) {
 		endpoint->AddClient(aclient);
@@ -450,10 +453,12 @@ void ApiListener::PersistMessage(const Dictionary::Ptr& message, const DynamicOb
 
 	pmessage->Set("message", JsonSerialize(message));
 	
-	Dictionary::Ptr secname = make_shared<Dictionary>();
-	secname->Set("type", secobj->GetType()->GetName());
-	secname->Set("name", secobj->GetName());
-	pmessage->Set("secobj", secname);
+	if (secobj) {
+		Dictionary::Ptr secname = make_shared<Dictionary>();
+		secname->Set("type", secobj->GetType()->GetName());
+		secname->Set("name", secobj->GetName());
+		pmessage->Set("secobj", secname);
+	}
 
 	boost::mutex::scoped_lock lock(m_LogLock);
 	if (m_LogFile) {
@@ -528,7 +533,7 @@ void ApiListener::SyncRelayMessage(const MessageOrigin& origin, const DynamicObj
 		}
 
 		/* only relay messages to zones which have access to the object */
-		if (!target_zone->CanAccessObject(secobj))
+		if (secobj && !target_zone->CanAccessObject(secobj))
 			continue;
 
 		finishedZones.insert(target_zone);
@@ -663,7 +668,8 @@ void ApiListener::ReplayLog(const ApiClient::Ptr& client)
 				Dictionary::Ptr pmessage;
 
 				try {
-					if (!NetString::ReadStringFromStream(logStream, &message))
+					NetStringContext context;
+					if (!NetString::ReadStringFromStream(logStream, &message, context))
 						break;
 
 					pmessage = JsonDeserialize(message);

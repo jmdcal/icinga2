@@ -97,8 +97,9 @@ int ObjectListCommand::Run(const boost::program_options::variables_map& vm, cons
 		type_filter = vm["type"].as<std::string>();
 
 	bool first = true;
+	NetStringContext context;
 
-	while (NetString::ReadStringFromStream(sfp, &message)) {
+	while (NetString::ReadStringFromStream(sfp, &message, context)) {
 		PrintObject(std::cout, first, message, type_count, name_filter, type_filter);
 		objects_count++;
 	}

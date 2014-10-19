@@ -18,16 +18,76 @@
  ******************************************************************************/
 
 #include "base/networkstream.hpp"
+#include "base/objectlock.hpp"
 
 using namespace icinga;
 
 NetworkStream::NetworkStream(const Socket::Ptr& socket)
 	: m_Socket(socket), m_Eof(false)
-{ }
+{
+	m_SendQ = make_shared<FIFO>();
+	m_RecvQ = make_shared<FIFO>();
+
+	m_Socket->MakeNonBlocking();
+	Poll::Register(m_Socket->GetFD(), this);
+}
+
+NetworkStream::~NetworkStream(void)
+{
+	Close();
+}
 
 void NetworkStream::Close(void)
 {
+	Poll::Unregister(m_Socket->GetFD());
 	m_Socket->Close();
+}
+
+bool NetworkStream::WantRead(void) const
+{
+	return true;
+}
+
+bool NetworkStream::WantWrite(void) const
+{
+	ObjectLock olock(m_SendQ);
+	return (m_SendQ->GetAvailableBytes() > 0);
+}
+
+void NetworkStream::ProcessReadable(void)
+{
+	char buffer[4096];
+	size_t rc = m_Socket->Read(buffer, 4096);
+
+	if (rc > 0) {
+		{
+			ObjectLock olock(m_RecvQ);
+			m_RecvQ->Write(buffer, rc);
+		}
+
+		OnDataAvailable();
+	} else {
+		Close();
+		m_Eof = true;
+	}
+}
+
+void NetworkStream::ProcessWritable(void)
+{
+	ObjectLock olock(m_SendQ);
+	size_t len = m_Socket->Write(m_SendQ->Peek(), m_SendQ->GetAvailableBytes());
+	if (len > 0)
+		m_SendQ->Read(NULL, len);
+	else {
+		Close();
+		m_Eof = true;
+	}
+}
+
+size_t NetworkStream::GetAvailableBytes(void) const
+{
+	ObjectLock olock(m_RecvQ);
+	return m_RecvQ->GetAvailableBytes();
 }
 
 /**
@@ -40,23 +100,8 @@ void NetworkStream::Close(void)
  */
 size_t NetworkStream::Read(void *buffer, size_t count)
 {
-	size_t rc;
-
-	if (m_Eof)
-		BOOST_THROW_EXCEPTION(std::invalid_argument("Tried to read from closed socket."));
-
-	try {
-		rc = m_Socket->Read(buffer, count);
-	} catch (...) {
-		m_Eof = true;
-
-		throw;
-	}
-
-	if (rc == 0)
-		m_Eof = true;
-
-	return rc;
+	ObjectLock olock(m_RecvQ);
+	return m_RecvQ->Read(buffer, count);
 }
 
 /**
@@ -68,27 +113,13 @@ size_t NetworkStream::Read(void *buffer, size_t count)
  */
 void NetworkStream::Write(const void *buffer, size_t count)
 {
-	size_t rc;
-
-	if (m_Eof)
-		BOOST_THROW_EXCEPTION(std::invalid_argument("Tried to write to closed socket."));
-
-	try {
-		rc = m_Socket->Write(buffer, count);
-	} catch (...) {
-		m_Eof = true;
-
-		throw;
-	}
-
-	if (rc < count) {
-		m_Eof = true;
-
-		BOOST_THROW_EXCEPTION(std::runtime_error("Short write for socket."));
-	}
+	ObjectLock olock(m_SendQ);
+	m_SendQ->Write(buffer, count);
+	Poll::Notify();
 }
 
 bool NetworkStream::IsEof(void) const
 {
-	return m_Eof;
+	ObjectLock olock(m_RecvQ);
+	return m_RecvQ->GetAvailableBytes() == 0 && m_Eof;
 }

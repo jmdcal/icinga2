@@ -24,6 +24,7 @@
 #include "base/tlsstream.hpp"
 #include "base/timer.hpp"
 #include "base/workqueue.hpp"
+#include "base/netstring.hpp"
 #include "remote/i2-remote.hpp"
 
 namespace icinga
@@ -47,8 +48,6 @@ public:
 
 	ApiClient(const String& identity, bool authenticated, const TlsStream::Ptr& stream, ConnectionRole role);
 
-	void Start(void);
-
 	String GetIdentity(void) const;
 	bool IsAuthenticated(void) const;
 	Endpoint::Ptr GetEndpoint(void) const;
@@ -65,13 +64,13 @@ private:
 	bool m_Authenticated;
 	Endpoint::Ptr m_Endpoint;
 	TlsStream::Ptr m_Stream;
+	NetStringContext m_NSContext;
 	ConnectionRole m_Role;
 	double m_Seen;
 
 	WorkQueue m_WriteQueue;
 
 	bool ProcessMessage(void);
-	void MessageThreadProc(void);
 	void SendMessageSync(const Dictionary::Ptr& request);
 };
 

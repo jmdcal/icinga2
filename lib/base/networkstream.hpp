@@ -23,6 +23,9 @@
 #include "base/i2-base.hpp"
 #include "base/stream.hpp"
 #include "base/socket.hpp"
+#include "base/fifo.hpp"
+#include <boost/signals2.hpp>
+#include "base/poll.hpp"
 
 namespace icinga
 {
@@ -32,12 +35,15 @@ namespace icinga
  *
  * @ingroup base
  */
-class I2_BASE_API NetworkStream : public Stream
+class I2_BASE_API NetworkStream : public Stream, PollEventHandler
 {
 public:
 	DECLARE_PTR_TYPEDEFS(NetworkStream);
 
+	boost::signals2::signal<void(void)> OnDataAvailable;
+
 	NetworkStream(const Socket::Ptr& socket);
+	~NetworkStream(void);
 
 	virtual size_t Read(void *buffer, size_t count);
 	virtual void Write(const void *buffer, size_t count);
@@ -46,9 +52,20 @@ public:
 
 	virtual bool IsEof(void) const;
 
+	size_t GetAvailableBytes(void) const;
+
+protected:
+	virtual bool WantRead(void) const;
+	virtual bool WantWrite(void) const;
+
+	virtual void ProcessReadable(void);
+	virtual void ProcessWritable(void);
+
 private:
 	Socket::Ptr m_Socket;
 	bool m_Eof;
+	FIFO::Ptr m_SendQ;
+	FIFO::Ptr m_RecvQ;
 };
 
 }

@@ -70,6 +70,7 @@ Socket::Socket(SOCKET fd)
 Socket::~Socket(void)
 {
 	Close();
+	closesocket(m_FD);
 }
 
 /**
@@ -107,12 +108,13 @@ SOCKET Socket::GetFD(void) const
  */
 void Socket::Close(void)
 {
-	ObjectLock olock(this);
-
-	if (m_FD != INVALID_SOCKET) {
-		closesocket(m_FD);
-		m_FD = INVALID_SOCKET;
-	}
+	shutdown(m_FD,
+#ifndef _WIN32
+	    SHUT_RDWR
+#else /* _WIN32 */
+	    SD_BOTH
+#endif /* _WIN32 */
+	    );
 }
 
 /**
@@ -414,5 +416,95 @@ void Socket::MakeNonBlocking(void)
 	Utility::SetNonBlockingSocket(GetFD());
 #else /* _WIN32 */
 	Utility::SetNonBlocking(GetFD());
+#endif /* _WIN32 */
+}
+
+void icinga::SocketPair(SOCKET sockets[2])
+{
+#ifndef _WIN32
+	if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) < 0) {
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("socketpair")
+			<< boost::errinfo_errno(errno));
+	}
+#else /* _WIN32 */
+	SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+	if (listener == INVALID_SOCKET) {
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("socket")
+			<< boost::errinfo_errno(errno));
+	}
+
+	sockaddr_in sin = {};
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	sin.sin_port = 0;
+
+	int opt = 1;
+	if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0) {
+		closesocket(listener);
+
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("setsockopt")
+			<< boost::errinfo_errno(errno));
+	}
+
+	if (bind(listener, (sockaddr *)&sin, sizeof(sin)) < 0) {
+		closesocket(listener);
+
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("bind")
+			<< boost::errinfo_errno(errno));
+	}
+
+	socklen_t addrlen = sizeof(sin);
+	if (getsockname(listener, (sockaddr *)&sin, &addrlen) < 0) {
+		closesocket(listener);
+
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("getsockname")
+			<< boost::errinfo_errno(errno));
+	}
+
+	if (listen(listener, 1) < 0) {
+		closesocket(listener);
+
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("listen")
+			<< boost::errinfo_errno(errno));
+	}
+
+	sockets[0] = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+	if (sockets[0] == INVALID_SOCKET) {
+		closesocket(listener);
+
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("getsockname")
+			<< boost::errinfo_errno(errno));
+	}
+
+	if (connect(sockets[0], (sockaddr *)&sin, sizeof(sin)) < 0) {
+		closesocket(listener);
+		closesocket(sockets[0]);
+
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("getsockname")
+			<< boost::errinfo_errno(errno));
+	}
+
+	sockets[1] = accept(listener, NULL, NULL);
+
+	closesocket(listener);
+
+	if (sockets[1] == INVALID_SOCKET) {
+		closesocket(sockets[0]);
+
+		BOOST_THROW_EXCEPTION(socket_error()
+			<< boost::errinfo_api_function("getsockname")
+			<< boost::errinfo_errno(errno));
+	}
+
 #endif /* _WIN32 */
 }

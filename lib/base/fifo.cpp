@@ -78,6 +78,11 @@ void FIFO::Optimize(void)
 	}
 }
 
+const void *FIFO::Peek(void)
+{
+	return m_Buffer;
+}
+
 /**
  * Implements IOQueue::Read.
  */
@@ -86,7 +91,7 @@ size_t FIFO::Read(void *buffer, size_t count)
 	if (count > m_DataSize)
 		count = m_DataSize;
 
-	if (buffer != NULL)
+	if (buffer)
 		std::memcpy(buffer, m_Buffer + m_Offset, count);
 
 	m_DataSize -= count;

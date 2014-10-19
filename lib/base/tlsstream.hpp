@@ -21,9 +21,9 @@
 #define TLSSTREAM_H
 
 #include "base/i2-base.hpp"
-#include "base/socket.hpp"
-#include "base/stream.hpp"
+#include "base/networkstream.hpp"
 #include "base/tlsutility.hpp"
+#include "base/fifo.hpp"
 
 namespace icinga
 {
@@ -38,7 +38,9 @@ class I2_BASE_API TlsStream : public Stream
 public:
 	DECLARE_PTR_TYPEDEFS(TlsStream);
 
-	TlsStream(const Socket::Ptr& socket, ConnectionRole role, const shared_ptr<SSL_CTX>& sslContext);
+	boost::signals2::signal<void(void)> OnDataAvailable;
+
+	TlsStream(const NetworkStream::Ptr& stream, ConnectionRole role, const shared_ptr<SSL_CTX>& sslContext);
 
 	shared_ptr<X509> GetClientCertificate(void) const;
 	shared_ptr<X509> GetPeerCertificate(void) const;
@@ -54,18 +56,35 @@ public:
 
 	bool IsVerifyOK(void) const;
 
+	size_t GetAvailableBytes(void) const;
+	void MakeNonBlocking(void);
+
 private:
 	shared_ptr<SSL> m_SSL;
+	mutable boost::condition_variable m_HandshakeCV;
 	bool m_Eof;
 	mutable boost::mutex m_SSLLock;
-	mutable boost::mutex m_IOActionLock;
+	bool m_HandshakeOK;
 	bool m_VerifyOK;
 
-	Socket::Ptr m_Socket;
+	BIO *m_SendQ;
+	BIO *m_RecvQ;
+
+	mutable boost::mutex m_QueueLock;
+	mutable boost::condition_variable m_QueueCV;
+	FIFO::Ptr m_PlainSendQ;
+	FIFO::Ptr m_PlainRecvQ;
+
+	NetworkStream::Ptr m_Stream;
 	ConnectionRole m_Role;
+
+	bool m_Blocking;
 
 	static int m_SSLIndex;
 	static bool m_SSLIndexInitialized;
+
+	void ProcessOutbound(void);
+	void ProcessTls(void);
 
 	static int ValidateCertificate(int preverify_ok, X509_STORE_CTX *ctx);
 	static void NullCertificateDeleter(X509 *certificate);

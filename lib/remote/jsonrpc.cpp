@@ -36,10 +36,10 @@ void JsonRpc::SendMessage(const Stream::Ptr& stream, const Dictionary::Ptr& mess
 	NetString::WriteStringToStream(stream, json);
 }
 
-Dictionary::Ptr JsonRpc::ReadMessage(const Stream::Ptr& stream)
+Dictionary::Ptr JsonRpc::ReadMessage(const Stream::Ptr& stream, NetStringContext& context)
 {
 	String jsonString;
-	if (!NetString::ReadStringFromStream(stream, &jsonString))
+	if (!NetString::ReadStringFromStream(stream, &jsonString, context))
 		return Dictionary::Ptr();
 
 	//std::cerr << "<< " << jsonString << std::endl;

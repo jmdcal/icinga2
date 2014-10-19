@@ -39,12 +39,10 @@ ApiClient::ApiClient(const String& identity, bool authenticated, const TlsStream
 {
 	if (authenticated)
 		m_Endpoint = Endpoint::GetByName(identity);
-}
 
-void ApiClient::Start(void)
-{
-	boost::thread thread(boost::bind(&ApiClient::MessageThreadProc, static_cast<ApiClient::Ptr>(GetSelf())));
-	thread.detach();
+	m_Stream->OnDataAvailable.connect(boost::bind(&ApiClient::ProcessMessage, this));
+
+	ProcessMessage();
 }
 
 String ApiClient::GetIdentity(void) const
@@ -129,11 +127,13 @@ bool ApiClient::ProcessMessage(void)
 {
 	Dictionary::Ptr message;
 
-	if (m_Stream->IsEof())
+	if (m_Stream->IsEof()) {
+		Disconnect();
 		return false;
+	}
 
 	try {
-		message = JsonRpc::ReadMessage(m_Stream);
+		message = JsonRpc::ReadMessage(m_Stream, m_NSContext);
 	} catch (const openssl_error& ex) {
 		const unsigned long *pe = boost::get_error_info<errinfo_openssl_error>(ex);
 
@@ -194,20 +194,6 @@ bool ApiClient::ProcessMessage(void)
 	}
 
 	return true;
-}
-
-void ApiClient::MessageThreadProc(void)
-{
-	Utility::SetThreadName("API Client");
-
-	try {
-		while (ProcessMessage())
-			; /* empty loop body */
-	} catch (const std::exception& ex) {
-		Log(LogWarning, "ApiClient", "Error while reading JSON-RPC message for identity '" + m_Identity + "': " + DiagnosticInformation(ex));
-	}
-
-	Disconnect();
 }
 
 Value SetLogPositionHandler(const MessageOrigin& origin, const Dictionary::Ptr& params)

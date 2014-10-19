@@ -331,7 +331,8 @@ void DynamicObject::RestoreObjects(const String& filename, int attributeTypes)
 	ParallelWorkQueue upq;
 
 	String message;
-	while (NetString::ReadStringFromStream(sfp, &message)) {
+	NetStringContext context;
+	while (NetString::ReadStringFromStream(sfp, &message, context)) {
 		upq.Enqueue(boost::bind(&DynamicObject::RestoreObject, message, attributeTypes));
 		restored++;
 	}
